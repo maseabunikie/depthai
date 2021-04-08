@@ -46,6 +46,9 @@ parser.add_argument("-scale", "--scale", default=1.0, type=float, help="Scale fa
 parser.add_argument('-sbb', '--spatial_bounding_box', action="store_true", help="Display spatial bounding box (ROI) when displaying spatial information. The Z coordinate get's calculated from the ROI (average)")
 parser.add_argument("-sbb-sf", "--sbb_scale_factor", default=0.3, type=float, help="Spatial bounding box scale factor. Sometimes lower scale factor can give better depth (Z) result. Default: %(default)s")
 parser.add_argument('-sync', '--sync', action="store_true", help="Enable NN/camera synchronization. If enabled, camera source will be from the NN's passthrough attribute")
+parser.add_argument("-monor", "--mono_resolution", default=400, type=int, choices=[400,720,800], help="Mono cam res height: (1280x)720, (1280x)800 or (640x)400. Default: %(default)s")
+parser.add_argument("-monof", "--mono_fps", default=30.0, type=float, help="Mono cam fps: max 60.0 for H:720 or H:800, max 120.0 for H:400. Default: %(default)s")
+
 args = parser.parse_args()
 
 debug = not args.no_debug
@@ -77,6 +80,10 @@ else:
 if args.rgb_resolution == 2160: rgb_res = dai.ColorCameraProperties.SensorResolution.THE_4_K
 elif args.rgb_resolution == 3040: rgb_res = dai.ColorCameraProperties.SensorResolution.THE_12_MP
 else: rgb_res = dai.ColorCameraProperties.SensorResolution.THE_1080_P
+
+if args.mono_resolution == 720: mono_res = dai.MonoCameraProperties.SensorResolution.THE_720_P
+elif args.mono_resolution == 800: mono_res = dai.MonoCameraProperties.SensorResolution.THE_800_P
+else: mono_res = dai.MonoCameraProperties.SensorResolution.THE_400_P
 
 if args.stereo_median_size == 3: median = dai.StereoDepthProperties.MedianFilter.KERNEL_3x3
 elif args.stereo_median_size == 5: median = dai.StereoDepthProperties.MedianFilter.KERNEL_5x5
@@ -167,7 +174,7 @@ class NNetManager:
             if self.sbb:
                 if args.sync: nn.passthroughDepth.link(nodes.xout_depth.input)
                 # If we want to display spatial bounding boxes, create XLinkOut node SBBs:
-                xout_sbb = self.p.createXLinkOut()
+                xout_sbb = p.createXLinkOut()
                 xout_sbb.setStreamName("sbb")
                 nn.boundingBoxMapping.link(xout_sbb.input)
 
@@ -269,7 +276,8 @@ class PipelineManager:
 
     def create_left_cam(self, create_xout):
         self.nodes.mono_left = self.p.createMonoCamera()
-        self.nodes.mono_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        self.nodes.mono_left.setResolution(mono_res)
+        self.nodes.mono_left.setFps(args.mono_fps)
         self.nodes.mono_left.setBoardSocket(dai.CameraBoardSocket.LEFT)
 
         if create_xout:
@@ -278,7 +286,8 @@ class PipelineManager:
 
     def create_right_cam(self, create_xout):
         self.nodes.mono_right = self.p.createMonoCamera()
-        self.nodes.mono_right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        self.nodes.mono_right.setResolution(mono_res)
+        self.nodes.mono_right.setFps(args.mono_fps)
         self.nodes.mono_right.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
         if create_xout:
